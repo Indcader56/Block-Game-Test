@@ -159,18 +159,17 @@ def iso_coord(block_x,block_z,block_y, chunk_x, chunk_z, chunk_y):
 
 block_sheet = pygame.image.load("blocks.png")
 
-# Used for spritesheets and animation (Credits to Coding with Russ)
-def get_image(sheet, frame, width, height, scale, color):
-	image = pygame.Surface((width, height))
-	image.blit(sheet, (0,0), ((frame* width),0, width, height))
-	image = pygame.transform.scale(image, (width * scale, height * scale))
+def get_image(sheet, frame_x, frame_y, width, height, scale_x, scale_y, color):
+	image = pygame.Surface((width, height), pygame.SRCALPHA)
+	image.blit(sheet, (0,0), ((frame_x* width),(frame_y* height), width, height))
+	image = pygame.transform.scale(image, (width * scale_x, height * scale_y))
 	image.set_colorkey(color)
 
-	return image.convert_alpha()
+	return image
 
 image_list = []
 def update_image_cache():
-    return [get_image(block_sheet, i, block_size, block_size, zoom/100, (0,0,0)) for i in range(11)]
+    return [get_image(block_sheet, i,0, block_size, block_size,zoom/100, zoom/100, (0,0,0)) for i in range(11)]
 
 clock = pygame.time.Clock()
 
@@ -317,7 +316,7 @@ while True:
     
 
     # Generates the block selection in the corner
-    selected_block = get_image(block_sheet, select_block, block_size, block_size, 3, (0,0,0))
+    selected_block = get_image(block_sheet, select_block,0, block_size, block_size, 3,3, (0,0,0))
     screen.blit(selected_block, (0, 0))
 
     pygame.display.flip()
