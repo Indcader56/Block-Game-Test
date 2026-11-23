@@ -1,10 +1,12 @@
 import pygame
 import sys
+
 import random
 import ast
 from pathlib import Path
 from perlin_noise import PerlinNoise
 import itertools
+import numpy as np
 
 import math
 
@@ -58,6 +60,11 @@ chunk_size_y = 16
 select_block = 0
 
 world_data = []
+
+wrld_data = {
+    (0,0,0): np.zeros((16,16,16), dtype=np.uint16)
+}
+
 
 
 # Also needs work, gotta make it work
@@ -287,8 +294,6 @@ while True:
 
     screen.fill((50,100,255))
 
-
-    
     chunk_i = 0
     for chunk_z,chunk_x,chunk_y in itertools.product(range(-1,2),repeat=3):
         block_i = 0
