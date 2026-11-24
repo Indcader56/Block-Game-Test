@@ -1,12 +1,10 @@
 import pygame
 import sys
-
 import random
 import ast
 from pathlib import Path
 from perlin_noise import PerlinNoise
 import itertools
-import numpy as np
 
 import math
 
@@ -26,7 +24,7 @@ zoom = 100
 
 player_x = 0
 player_z = 0
-player_y = 200
+player_y = 0
 
 player_block_x = 0
 player_block_z = 0
@@ -59,12 +57,39 @@ chunk_size_y = 16
 
 select_block = 0
 
-#world_data = []
-world_data = np.array([])
+world_data = []
 
-wrld_data = {
-    (0,0,0): np.zeros((16,16,16), dtype=np.uint16)
-}
+
+# Also needs work, gotta make it work
+def get_index(local_block_x,local_block_z, local_block_y, chunk_x, chunk_z, chunk_y):
+    return local_block_y + (local_block_x*16) + (local_block_z*256)
+
+"""
+Needs work, right now the chunk borders are generated no matter what.
+Also, I gotta figure out when to update this list. Constantly or 
+if certain actions are done
+"""
+def cull_blocks():
+    temp_list = []
+
+    i = 0
+    for chunk_z in range(3):
+        for chunk_x in range(3):
+            for chunk_y in range(3):
+                for block_z in range(16):
+                    for block_x in range(16):
+                        for block_y in range(16):
+                            if world_data[i] == 0:
+                                temp_list.append(0)
+                            else:
+                                if block_y == 0 or block_y == 15 or block_x == 0 or block_x == 15 or block_z == 0 or block_z == 15:
+                                    temp_list.append(1)
+                                elif world_data[i-1] != 0 and world_data[i+1] != 0 and world_data[i-16] != 0 and world_data[i+16] != 0 and world_data[i-256] != 0 and world_data[i+256] != 0:
+                                    temp_list.append(0)
+                                else:
+                                    temp_list.append(1)
+                            i += 1
+    return temp_list
 
 
 def get_chunk_data():
@@ -105,9 +130,11 @@ def get_chunk_data():
     return final_list
 
 world_data = get_chunk_data()
+cull_list = cull_blocks()
 
 def change_file_data():
     global world_data
+
 
     world_file = open(f"{player_chunk_x},{player_chunk_z},{player_chunk_y}.txt", "w")
 
@@ -132,17 +159,18 @@ def iso_coord(block_x,block_z,block_y, chunk_x, chunk_z, chunk_y):
 
 block_sheet = pygame.image.load("blocks.png")
 
-def get_image(sheet, frame_x, frame_y, width, height, scale_x, scale_y, color):
-	image = pygame.Surface((width, height), pygame.SRCALPHA)
-	image.blit(sheet, (0,0), ((frame_x* width),(frame_y* height), width, height))
-	image = pygame.transform.scale(image, (width * scale_x, height * scale_y))
+# Used for spritesheets and animation (Credits to Coding with Russ)
+def get_image(sheet, frame, width, height, scale, color):
+	image = pygame.Surface((width, height))
+	image.blit(sheet, (0,0), ((frame* width),0, width, height))
+	image = pygame.transform.scale(image, (width * scale, height * scale))
 	image.set_colorkey(color)
 
-	return image
+	return image.convert_alpha()
 
 image_list = []
 def update_image_cache():
-    return [get_image(block_sheet, i,0, block_size, block_size,zoom/100, zoom/100, (0,0,0)) for i in range(11)]
+    return [get_image(block_sheet, i, block_size, block_size, zoom/100, (0,0,0)) for i in range(11)]
 
 clock = pygame.time.Clock()
 
@@ -233,14 +261,14 @@ while True:
         past_player_chunk_y = int(player_chunk_y)
 
         world_data = get_chunk_data()
-
+        cull_list = cull_blocks()
 
     if click == 1:
         if iso_mouse_block_x > -1 and iso_mouse_block_x < chunk_size_x and iso_mouse_block_z > -1 and iso_mouse_block_z < chunk_size_z and iso_mouse_block_y > -1 and iso_mouse_block_y < chunk_size_y:
             if world_data[iso_mouse_block_y+((iso_mouse_block_x)*chunk_size_x)+((iso_mouse_block_z)*chunk_size_x*chunk_size_z)+53248] != select_block:
                 world_data[iso_mouse_block_y+((iso_mouse_block_x)*chunk_size_x)+((iso_mouse_block_z)*chunk_size_x*chunk_size_z)+53248] = select_block
                 change_file_data()
-
+                cull_list = cull_blocks()
 
 
     if select_block > 8:
@@ -260,25 +288,24 @@ while True:
 
     screen.fill((50,100,255))
 
+
+    
     chunk_i = 0
     for chunk_z,chunk_x,chunk_y in itertools.product(range(-1,2),repeat=3):
         block_i = 0
 
         for block_z,block_x,block_y in itertools.product(range(chunk_size_z),range(chunk_size_x),range(chunk_size_y)):
-
             # Generates Block
-            sliced_block = image_list[world_data[block_i+(chunk_i*4096)]]
-            screen.blit(sliced_block, iso_coord(block_x, block_z, block_y, chunk_x, chunk_z, chunk_y))
-
+            if cull_list[block_i+(chunk_i*4096)] == 1:
+                sliced_block = image_list[world_data[block_i+(chunk_i*4096)]]
+                screen.blit(sliced_block, iso_coord(block_x, block_z, block_y, chunk_x, chunk_z, chunk_y))
             # Generates the player's mouse tip
             if block_x+(chunk_x*16) == iso_mouse_block_x and block_y+(chunk_y*16) == iso_mouse_block_y and block_z+(chunk_z*16) == iso_mouse_block_z:
                 if world_data[block_i+(chunk_i*4096)] == 0:
                     mouse_block = image_list[8]
                 else:
                     mouse_block = image_list[9]
-
                 screen.blit(mouse_block, iso_coord(block_x, block_z, block_y, chunk_x, chunk_z, chunk_y))
-
             # Generates the player at a certain block pos
             if block_x+(chunk_x*16) == player_block_x-(player_chunk_x*chunk_size_x) and block_y+(chunk_y*16) == player_block_y-(player_chunk_y*chunk_size_y) and block_z+(chunk_z*16) == player_block_z-(player_chunk_z*chunk_size_z):
                 player_block = image_list[10]
@@ -290,9 +317,10 @@ while True:
     
 
     # Generates the block selection in the corner
-    selected_block = get_image(block_sheet, select_block,0, block_size, block_size, 3,3, (0,0,0))
+    selected_block = get_image(block_sheet, select_block, block_size, block_size, 3, (0,0,0))
     screen.blit(selected_block, (0, 0))
 
     pygame.display.flip()
 
     clock.tick(60)
+
